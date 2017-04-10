@@ -13,6 +13,7 @@ int main() {
     puts("aaa");
     puts_orig = intercept_function("puts", my_puts);
     puts("bbb");
+    puts_orig("uszanowanko");
     unintercept_function("puts");
     puts("ccc");
 }

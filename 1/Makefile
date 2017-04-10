@@ -3,10 +3,10 @@ CFLAGS=-Wall -O0 -fPIC -g
 
 target: interceptor.so
 
-interceptor.so: interceptor.c
+libinterceptor.so: interceptor.c
 	$(CC) $^ -shared -o $@ $(CFLAGS)
 
-example: example.c interceptor.so
+example: example.c libinterceptor.so
 	$(CC) $^ -o $@ $(CFLAGS)
 
 clean:
