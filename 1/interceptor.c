@@ -67,13 +67,13 @@ static int substitute_callback(struct dl_phdr_info *info, size_t size, void *_da
     int j;
     // this is for vd.so
     // TODO how to do this correctly?
-    //dummy++;
-    //if (dummy == 2)
-    //    return 0;
+    dummy++;
+    if (dummy == 2)
+        return 0;
     /* find .dynamic segment in an ELF file */
 
-    printf("name=%s (%d segments)\n", info->dlpi_name,
-            info->dlpi_phnum);
+    //printf("name=%s (%d segments)\n", info->dlpi_name,
+    //        info->dlpi_phnum);
     for (j = 0; j < info->dlpi_phnum; j++) {
         if (info->dlpi_phdr[j].p_type != PT_DYNAMIC)
             continue;
@@ -83,8 +83,8 @@ static int substitute_callback(struct dl_phdr_info *info, size_t size, void *_da
         Elf64_Sym *symtab;
         Elf64_Rela *reloc;
         Elf64_Xword nreloc;
-         printf("\t\t header %2d: address=%10p\n", j,
-                    (void *) (info->dlpi_addr + info->dlpi_phdr[j].p_vaddr));
+        // printf("\t\t header %2d: address=%10p\n", j,
+        //            (void *) (info->dlpi_addr + info->dlpi_phdr[j].p_vaddr));
         /* search for the string table and relocations */
         for (; dyn_hdr->d_tag != DT_NULL; dyn_hdr++) {
             if (dyn_hdr->d_tag == DT_STRTAB)
@@ -99,10 +99,10 @@ static int substitute_callback(struct dl_phdr_info *info, size_t size, void *_da
         for (Elf64_Rela *ii = reloc; ii != reloc + nreloc; ii++) {
             if (ELF64_R_TYPE(ii->r_info) != R_X86_64_JUMP_SLOT)
                 continue;
-            printf("symbol table: %10p\nindex: %ld\n", symtab, ELF64_R_SYM(ii->r_info));
             Elf64_Sym *sym = symtab + ELF64_R_SYM(ii->r_info);
-            //char *symbol_name = strtab + sym->st_name;
-            //printf("%s\n", symbol_name);
+            char *symbol_name = strtab + sym->st_name;
+            printf(">>>>> relocation found: %s\n", symbol_name);
+            // TODO replace sought relocation with our custom evil one!
         }
     }
     return 0;
