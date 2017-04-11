@@ -8,7 +8,7 @@ TESTS = \
 		test-sysv-hash \
 		test-invalid \
 		test-conflicts \
-	#	test-ifunc \
+	 	test-ifunc \
 		$(null)
 
 

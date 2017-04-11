@@ -49,10 +49,19 @@ static int resolve_callback(struct dl_phdr_info *info, size_t size, void *_data)
             //printf("%d, STT_FUNC = %d\n", ii->st_info % 16);
 
             char *symbol_name = strtab + ii->st_name;
-            if (strcmp(symbol_name, (char *)data->fname) == 0 &&
-                    (ii->st_info % 16) == STT_FUNC) {
-                /* the first occurence of searched function is returned */
-                data->faddr = (void *)(info->dlpi_addr + ii->st_value);
+            if (strcmp(symbol_name, (char *)data->fname) == 0) {
+                if ((ii->st_info % 16) == STT_FUNC) {
+                    /* the first occurence of searched function is returned */
+                    data->faddr = (void *)(info->dlpi_addr + ii->st_value);
+                }
+                if ((ii->st_info % 16) == STT_GNU_IFUNC) {
+                    /*
+                     * in case of an indirect function,
+                     * we return its return value
+                     */
+                    void *(*ifun)(void) = (void *(*)())(info->dlpi_addr + ii->st_value);
+                    data->faddr = ifun();
+                }
                 return 1;
             }
         }
