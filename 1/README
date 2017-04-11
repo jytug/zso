@@ -1,0 +1,15 @@
+# Interceptor
+
+Rozwiązanie opiera się na dwóch funkcjach:
+
+* `void *resolve_function(const char *name)` - ta funkcja przegląda wszystkie
+    dynamiczne nagłówki załadowanych do pamięci ELF-ów (z wyjątkiem vDSO,
+    który z różnych przyczyn jest pomijany), zwracając adres pierwszego
+    symbolu STT_FUNC lub STT_GNU_IFUNC
+* `void substitute(const char *name, void *new_func)` - ta funkcja przegląda
+    załadowane do pamięci elfy (podobnie jak poprzednia), w poszukiwaniu
+    relokacji R_X86_64_JUMP_SLOT, aby w tej odpowiadającej
+    symbolowi `name` podmienić adres na `new_func`.
+
+Z wykorzystaniem tych funkcji łatwo zaimplementować `intercept_function`
+oraz `unintercept_function`, w sposób widoczny w implementacji.

@@ -124,6 +124,7 @@ substitute_callback(struct dl_phdr_info *info, size_t size, void *_data) {
                 nreloc = (xword_t)(dyn_hdr->d_un.d_val / sizeof(rela_t));
         }
 
+        /* search for the apropriate R_X86_64_JUMP_SLOT relocation */
         for (rela_t *reloc = reloc_base; reloc != reloc_base + nreloc; reloc++) {
             if (ELF64_R_TYPE(reloc->r_info) != R_X86_64_JUMP_SLOT)
                 continue;
