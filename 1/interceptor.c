@@ -12,11 +12,11 @@ static int dummy = 0;
 typedef struct {
     const char *fname;
     void *faddr;
-} resolve_communicator;
+} callback_communicator;
 
 static int resolve_callback(struct dl_phdr_info *info, size_t size, void *_data) {
     int j;
-    resolve_communicator *data = (resolve_communicator *)_data;
+    callback_communicator *data = (callback_communicator *)_data;
     // this is for vd.so
     // TODO how to do this correctly?
     dummy++;
@@ -57,7 +57,8 @@ static int resolve_callback(struct dl_phdr_info *info, size_t size, void *_data)
 }
 
 static void *resolve_function(const char *name) {
-    resolve_communicator rc;
+    dummy = 0;
+    callback_communicator rc;
     rc.fname = name;
     dl_iterate_phdr(resolve_callback, &rc);
     return rc.faddr;
@@ -70,10 +71,10 @@ static int substitute_callback(struct dl_phdr_info *info, size_t size, void *_da
     dummy++;
     if (dummy == 2)
         return 0;
-    /* find .dynamic segment in an ELF file */
 
-    //printf("name=%s (%d segments)\n", info->dlpi_name,
-    //        info->dlpi_phnum);
+    callback_communicator *data = (callback_communicator *)_data;
+
+    /* find .dynamic segment in an ELF file */
     for (j = 0; j < info->dlpi_phnum; j++) {
         if (info->dlpi_phdr[j].p_type != PT_DYNAMIC)
             continue;
@@ -83,9 +84,8 @@ static int substitute_callback(struct dl_phdr_info *info, size_t size, void *_da
         Elf64_Sym *symtab;
         Elf64_Rela *reloc;
         Elf64_Xword nreloc;
-        // printf("\t\t header %2d: address=%10p\n", j,
-        //            (void *) (info->dlpi_addr + info->dlpi_phdr[j].p_vaddr));
-        /* search for the string table and relocations */
+
+        /* search for the string table, symbol table and relocation table */
         for (; dyn_hdr->d_tag != DT_NULL; dyn_hdr++) {
             if (dyn_hdr->d_tag == DT_STRTAB)
                 strtab = (char *)(dyn_hdr->d_un.d_ptr);
@@ -96,23 +96,27 @@ static int substitute_callback(struct dl_phdr_info *info, size_t size, void *_da
             if (dyn_hdr->d_tag == DT_PLTRELSZ)
                 nreloc = (Elf64_Xword)(dyn_hdr->d_un.d_val / sizeof(Elf64_Rela));
         }
+
         for (Elf64_Rela *ii = reloc; ii != reloc + nreloc; ii++) {
             if (ELF64_R_TYPE(ii->r_info) != R_X86_64_JUMP_SLOT)
                 continue;
             Elf64_Sym *sym = symtab + ELF64_R_SYM(ii->r_info);
             char *symbol_name = strtab + sym->st_name;
-            printf(">>>>> relocation found: %s\n", symbol_name);
-            // TODO replace sought relocation with our custom evil one!
+
+            /* replace sought relocation with our own */
+            Elf64_Addr *reloc_addr = (Elf64_Addr *)(info->dlpi_addr + ii->r_offset);
+            if (strcmp(symbol_name, data->fname) == 0)
+            *reloc_addr = (Elf64_Addr)(data->faddr - info->dlpi_addr);
         }
     }
     return 0;
 }
 
 static void substitute(const char *name, void *new_func) {
-    // TODO this
     dummy = 0;
-    resolve_communicator rc;
+    callback_communicator rc;
     rc.fname = name;
+    rc.faddr = new_func;
     dl_iterate_phdr(substitute_callback, &rc);
 }
 
@@ -124,5 +128,6 @@ void *intercept_function(const char *name, void *new_func) {
 }
 
 void unintercept_function(const char *name) {
-
+    void *old_func = resolve_function(name);
+    substitute(name, old_func);
 }
