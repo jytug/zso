@@ -1,0 +1,23 @@
+Usage:
+ - copy (or symlink) libinterceptor.so to this directory
+ - call: make all test
+
+Correct output:
+
+    $ make all
+    cc -g -Wall -Wextra -Wno-unused-parameter -Wno-return-type -fPIC   -c -o lib1.o lib1.c
+    (...)
+    $ make test
+    diff ./test-simple.output <(./test-simple)
+    diff ./test-double-intercept.output <(./test-double-intercept)
+    diff ./test-dlsym.output <(./test-dlsym)
+    diff ./test-lib1.output <(./test-lib1)
+    diff ./test-lib2.output <(./test-lib2)
+    diff ./test-lib-chain.output <(./test-lib-chain)
+    diff ./test-sysv-hash.output <(./test-sysv-hash)
+    diff ./test-invalid.output <(./test-invalid)
+    diff ./test-conflicts.output <(./test-conflicts)
+    diff ./test-ifunc.output <(./test-ifunc)
+
+
+Tests scoring: 1 point for each test

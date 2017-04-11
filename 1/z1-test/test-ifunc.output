@@ -1,0 +1,4 @@
+index result: bcdefg
+looking for c in  'abcdefg'
+index result: cdefg
+index result: defg

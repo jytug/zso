@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-Wall -O0 -fPIC -g
 
-target: interceptor.so
+target: libinterceptor.so
 
 libinterceptor.so: interceptor.c
 	$(CC) $^ -shared -o $@ $(CFLAGS)

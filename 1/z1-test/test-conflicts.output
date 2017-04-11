@@ -1,0 +1,4 @@
+lib4: f1: aaa
+intercepted
+lib4: bbb
+lib4: f1: ccc

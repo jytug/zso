@@ -4,10 +4,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/auxv.h>
 
 #include "interceptor.h"
-
-static int dummy = 0;
 
 typedef struct {
     const char *fname;
@@ -16,13 +15,16 @@ typedef struct {
 
 static int resolve_callback(struct dl_phdr_info *info, size_t size, void *_data) {
     int j;
-    callback_communicator *data = (callback_communicator *)_data;
-    // this is for vd.so
-    // TODO how to do this correctly?
-    dummy++;
-    if (dummy == 2)
+
+    /* omit the vDSO library */
+    Elf64_Ehdr* ehdr_vdso = (Elf64_Ehdr *)getauxval(AT_SYSINFO_EHDR);
+    Elf64_Phdr* phdr_vdso =
+        (Elf64_Phdr *)(getauxval(AT_SYSINFO_EHDR) + ehdr_vdso->e_phoff);
+    if (phdr_vdso == info->dlpi_phdr)
         return 0;
-    /* find .dynamic segment in an ELF file */
+
+    callback_communicator *data = (callback_communicator *)_data;
+
     for (j = 0; j < info->dlpi_phnum; j++) {
         if (info->dlpi_phdr[j].p_type != PT_DYNAMIC)
             continue;
@@ -32,7 +34,7 @@ static int resolve_callback(struct dl_phdr_info *info, size_t size, void *_data)
         char *strtab;
         Elf64_Sym *symtab;
 
-        /* search for symbol table and string table in this segment */
+        /* search for the symbol table and the string table in this segment */
         for (; dyn_hdr->d_tag != DT_NULL; dyn_hdr++) {
             if (dyn_hdr->d_tag == DT_STRTAB)
                 strtab = (char *)(dyn_hdr->d_un.d_ptr);
@@ -44,9 +46,11 @@ static int resolve_callback(struct dl_phdr_info *info, size_t size, void *_data)
         for (Elf64_Sym *ii = symtab; (char *)ii != strtab; ii++) {
             if (ii->st_shndx == STN_UNDEF)
                 continue;
+            //printf("%d, STT_FUNC = %d\n", ii->st_info % 16);
 
             char *symbol_name = strtab + ii->st_name;
-            if (strcmp(symbol_name, (char *)data->fname) == 0) {
+            if (strcmp(symbol_name, (char *)data->fname) == 0 &&
+                    (ii->st_info % 16) == STT_FUNC) {
                 /* the first occurence of searched function is returned */
                 data->faddr = (void *)(info->dlpi_addr + ii->st_value);
                 return 1;
@@ -57,19 +61,22 @@ static int resolve_callback(struct dl_phdr_info *info, size_t size, void *_data)
 }
 
 static void *resolve_function(const char *name) {
-    dummy = 0;
     callback_communicator rc;
     rc.fname = name;
+    rc.faddr = NULL;
     dl_iterate_phdr(resolve_callback, &rc);
     return rc.faddr;
 }
 
-static int substitute_callback(struct dl_phdr_info *info, size_t size, void *_data) {
+static int
+substitute_callback(struct dl_phdr_info *info, size_t size, void *_data) {
     int j;
-    // this is for vd.so
-    // TODO how to do this correctly?
-    dummy++;
-    if (dummy == 2)
+
+    /* omit the vDSO library */
+    Elf64_Ehdr* ehdr_vdso = (Elf64_Ehdr *)getauxval(AT_SYSINFO_EHDR);
+    Elf64_Phdr* phdr_vdso =
+        (Elf64_Phdr *)(getauxval(AT_SYSINFO_EHDR) + ehdr_vdso->e_phoff);
+    if (phdr_vdso == info->dlpi_phdr)
         return 0;
 
     callback_communicator *data = (callback_communicator *)_data;
@@ -105,21 +112,21 @@ static int substitute_callback(struct dl_phdr_info *info, size_t size, void *_da
 
             /* replace sought relocation with our own */
             Elf64_Addr *reloc_addr = (Elf64_Addr *)(info->dlpi_addr + ii->r_offset);
-            if (strcmp(symbol_name, data->fname) == 0)
-            *reloc_addr = (Elf64_Addr)(data->faddr - info->dlpi_addr);
+            if (strcmp(symbol_name, data->fname) == 0) {
+                *reloc_addr = (Elf64_Addr)(data->faddr);
+                return 0;
+            }
         }
     }
     return 0;
 }
 
 static void substitute(const char *name, void *new_func) {
-    dummy = 0;
     callback_communicator rc;
     rc.fname = name;
     rc.faddr = new_func;
     dl_iterate_phdr(substitute_callback, &rc);
 }
-
 
 void *intercept_function(const char *name, void *new_func) {
     void *old_func = resolve_function(name);
